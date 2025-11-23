@@ -673,52 +673,67 @@ class FridgeFriend {
         this.showScreen('mainScreen');
     }
 
-    // 🔔 ИСПРАВЛЕННЫЕ УВЕДОМЛЕНИЯ
-    showMessage(message, type) {
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <span class="notification-message">${message}</span>
-                <button class="notification-close" onclick="this.parentElement.parentElement.remove(); window.fridgeFriend.recalculateNotifications()">×</button>
-            </div>
+// 🔔 ИСПРАВЛЕННЫЕ УВЕДОМЛЕНИЯ БЕЗ НАЛОЖЕНИЯ
+showMessage(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-message">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.parentElement.remove(); window.fridgeFriend.recalculateNotifications()">×</button>
+        </div>
+    `;
+    
+    // Создаем контейнер для уведомлений если его нет
+    let notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.id = 'notification-container';
+        notificationContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 350px;
         `;
-        
-        // Находим все существующие уведомления
-        const existingNotifications = document.querySelectorAll('.notification');
-        const totalNotifications = existingNotifications.length;
-        
-        // Сдвигаем все существующие уведомления вниз
-        existingNotifications.forEach((notif, index) => {
-            notif.style.top = `${20 + (index + 1) * 80}px`;
-        });
-        
-        // Устанавливаем позицию для нового уведомления
-        notification.style.top = `${20 + totalNotifications * 80}px`;
-        
-        document.body.appendChild(notification);
-        
-        // Автоматическое удаление через 4 секунды
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.classList.add('fade-out');
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                        this.recalculateNotifications();
-                    }
-                }, 300);
-            }
-        }, 4000);
+        document.body.appendChild(notificationContainer);
     }
+    
+    // Добавляем уведомление в контейнер
+    notificationContainer.appendChild(notification);
+    
+    // Пересчитываем позиции всех уведомлений
+    this.recalculateNotifications();
+    
+    // Автоматическое удаление через 4 секунды
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.classList.add('fade-out');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                    this.recalculateNotifications();
+                }
+            }, 300);
+        }
+    }, 4000);
+}
 
-    recalculateNotifications() {
-        const notifications = document.querySelectorAll('.notification');
-        notifications.forEach((notif, index) => {
-            notif.style.top = `${20 + index * 80}px`;
-        });
-    }
-
+recalculateNotifications() {
+    const notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) return;
+    
+    const notifications = notificationContainer.querySelectorAll('.notification');
+    let currentTop = 20;
+    
+    notifications.forEach((notif) => {
+        notif.style.transform = `translateY(${currentTop}px)`;
+        currentTop += notif.offsetHeight + 10; // 10px отступ между уведомлениями
+    });
+}
     isProductExpiring(expiryDate) {
         const today = new Date();
         const threeDaysLater = new Date();
