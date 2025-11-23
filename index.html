@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FridgeFriend - Умный кухонный помощник</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1>🍎 FridgeFriend</h1>
+                <small>Умный помощник для вашей кухни</small>
+            </div>
+            <div class="auth-btn-container">
+                <span id="userWelcome" style="display: none;"></span>
+                <button id="authBtn" class="btn-secondary">🔐 Войти</button>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <section id="mainScreen" class="screen active">
+            <!-- Статистика -->
+            <div class="dashboard">
+                <div class="stats-card">
+                    <h3>📊 Статистика холодильника</h3>
+                    <div id="statsContent">
+                        <p>Продуктов: <span id="productCount">0</span></p>
+                        <p>Скоро испортится: <span id="expiringCount">0</span></p>
+                        <p>Можно приготовить: <span id="recipesCount">0</span> рецептов</p>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button id="addProductBtn" class="btn-primary">➕ Добавить продукт</button>
+                    <button id="viewRecipesBtn" class="btn-secondary">📖 Рекомендуемые рецепты</button>
+                    <button id="clearDataBtn" class="btn-warning">🗑️ Очистить данные</button>
+                </div>
+            </div>
+
+            <!-- Список продуктов -->
+            <div class="products-section">
+                <h2>🥫 Ваши продукты</h2>
+                <div class="filter-tabs">
+                    <button class="filter-btn active" data-filter="all">Все</button>
+                    <button class="filter-btn" data-filter="expiring">Скоро испортятся</button>
+                    <button class="filter-btn" data-filter="fresh">Свежие</button>
+                </div>
+                <div id="productsList" class="products-grid">
+                    <!-- Продукты будут здесь -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Экран рецептов -->
+        <section id="recipesScreen" class="screen">
+            <div class="screen-header">
+                <button class="back-btn">← Назад к холодильнику</button>
+                <h2>📖 Рекомендуемые рецепты</h2>
+            </div>
+            <div id="recipesList" class="recipes-grid">
+                <!-- Рецепты будут здесь -->
+            </div>
+        </section>
+
+        <!-- Модальное окно добавления продукта -->
+        <div id="addProductModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3>➕ Добавить продукт</h3>
+                <form id="addProductForm">
+                    <div class="form-group">
+                        <label for="productName">Продукт:</label>
+                        <select id="productName" required>
+                            <option value="">Выберите продукт</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Количество:</label>
+                        <input type="number" id="quantity" step="0.1" min="0.1" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseDate">Дата покупки:</label>
+                        <input type="date" id="purchaseDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expiryDate">Срок годности:</label>
+                        <input type="date" id="expiryDate" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Добавить в холодильник</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Окно авторизации -->
+        <div id="authModal" class="modal">
+            <div class="modal-content auth-modal-content">
+                <span class="close auth-close">&times;</span>
+                <div class="cotn_principal">
+                    <div class="cont_centrar">
+                        <div class="cont_login">
+                            <div class="cont_info_log_sign_up">
+                                <div class="col_md_login">
+                                    <div class="cont_ba_opcitiy">
+                                        <h2>ВХОД</h2>  
+                                        <p>Войдите в свой аккаунт FridgeFriend</p> 
+                                        <button class="btn_login" onclick="change_to_login()">ВОЙТИ</button>
+                                    </div>
+                                </div>
+                                <div class="col_md_sign_up">
+                                    <div class="cont_ba_opcitiy">
+                                        <h2>РЕГИСТРАЦИЯ</h2>
+                                        <p>Создайте новый аккаунт</p>
+                                        <button class="btn_sign_up" onclick="change_to_sign_up()">ЗАРЕГИСТРИРОВАТЬСЯ</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="cont_back_info">
+                                <div class="cont_img_back_grey">
+                                    <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" alt="Fridge" />
+                                </div>
+                            </div>
+                            
+                            <div class="cont_forms">
+                                <div class="cont_img_back_">
+                                    <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" alt="Fridge" />
+                                </div>
+                                
+                                <div class="cont_form_login">
+                                    <a href="#" onclick="hidden_login_and_sign_up()"><i class="material-icons">&#xE5C4;</i></a>
+                                    <h2>ВХОД</h2>
+                                    <input type="email" id="loginEmail" placeholder="Email" />
+                                    <input type="password" id="loginPassword" placeholder="Пароль" />
+                                    <button class="btn_login" onclick="login()">ВОЙТИ</button>
+                                </div>
+                                
+                                <div class="cont_form_sign_up">
+                                    <a href="#" onclick="hidden_login_and_sign_up()"><i class="material-icons">&#xE5C4;</i></a>
+                                    <h2>РЕГИСТРАЦИЯ</h2>
+                                    <input type="text" id="signupUsername" placeholder="Имя пользователя" />
+                                    <input type="email" id="signupEmail" placeholder="Email" />
+                                    <input type="password" id="signupPassword" placeholder="Пароль" />
+                                    <button class="btn_sign_up" onclick="signup()">ЗАРЕГИСТРИРОВАТЬСЯ</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
