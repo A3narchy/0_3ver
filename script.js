@@ -673,29 +673,59 @@ class FridgeFriend {
         this.showScreen('mainScreen');
     }
 
-    showMessage(message, type) {
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'success' ? '#2ecc71' : '#e74c3c'};
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 10000;
-            animation: slideIn 0.3s ease;
-        `;
-        notification.textContent = message;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
-    }
+showMessage(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#2ecc71' : '#e74c3c'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+        margin-bottom: 10px;
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
+    notification.textContent = message;
+    
+    // Находим все существующие уведомления
+    const existingNotifications = document.querySelectorAll('.notification');
+    
+    // Считаем общее количество уведомлений для позиционирования
+    const totalNotifications = existingNotifications.length;
+    
+    // Сдвигаем все существующие уведомления вниз
+    existingNotifications.forEach((notif, index) => {
+        notif.style.top = `${20 + (index + 1) * 70}px`;
+    });
+    
+    // Устанавливаем позицию для нового уведомления
+    notification.style.top = `${20 + totalNotifications * 70}px`;
+    
+    document.body.appendChild(notification);
+    
+    // Автоматическое удаление через 3 секунды
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+            // После удаления пересчитываем позиции оставшихся уведомлений
+            this.recalculateNotifications();
+        }
+    }, 3000);
+}
+
+// Новый метод для пересчета позиций уведомлений после удаления
+recalculateNotifications() {
+    const notifications = document.querySelectorAll('.notification');
+    notifications.forEach((notif, index) => {
+        notif.style.top = `${20 + index * 70}px`;
+    });
+}
 
     isProductExpiring(expiryDate) {
         const today = new Date();
@@ -796,4 +826,5 @@ document.head.appendChild(style);
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
     window.fridgeFriend = new FridgeFriend();
+
 });
