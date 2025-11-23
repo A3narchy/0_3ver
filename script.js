@@ -1,4 +1,4 @@
-// Конфигурация Supabase - ЗАМЕНИ НА СВОИ ДАННЫЕ!
+// Конфигурация Supabase
 const SUPABASE_URL = 'https://ntcschzvtnnvdkixcsho.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50Y3NjaHp2dG5udmRraXhjc2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTEzMDUsImV4cCI6MjA3OTQ2NzMwNX0.ejDPEx5bXDznE25mej9p0tmP1-c_wuOip2HHsWCXWBE';
 
@@ -673,28 +673,50 @@ class FridgeFriend {
         this.showScreen('mainScreen');
     }
 
+    // 🔔 ИСПРАВЛЕННЫЕ УВЕДОМЛЕНИЯ
     showMessage(message, type) {
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'success' ? '#2ecc71' : '#e74c3c'};
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 10000;
-            animation: slideIn 0.3s ease;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span class="notification-message">${message}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove(); window.fridgeFriend.recalculateNotifications()">×</button>
+            </div>
         `;
-        notification.textContent = message;
+        
+        // Находим все существующие уведомления
+        const existingNotifications = document.querySelectorAll('.notification');
+        const totalNotifications = existingNotifications.length;
+        
+        // Сдвигаем все существующие уведомления вниз
+        existingNotifications.forEach((notif, index) => {
+            notif.style.top = `${20 + (index + 1) * 80}px`;
+        });
+        
+        // Устанавливаем позицию для нового уведомления
+        notification.style.top = `${20 + totalNotifications * 80}px`;
         
         document.body.appendChild(notification);
         
+        // Автоматическое удаление через 4 секунды
         setTimeout(() => {
-            notification.remove();
-        }, 3000);
+            if (notification.parentNode) {
+                notification.classList.add('fade-out');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                        this.recalculateNotifications();
+                    }
+                }, 300);
+            }
+        }, 4000);
+    }
+
+    recalculateNotifications() {
+        const notifications = document.querySelectorAll('.notification');
+        notifications.forEach((notif, index) => {
+            notif.style.top = `${20 + index * 80}px`;
+        });
     }
 
     isProductExpiring(expiryDate) {
@@ -773,25 +795,6 @@ function login() {
 function signup() {
     window.fridgeFriend.signup();
 }
-
-// Добавляем CSS для анимаций
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .product-card, .recipe-card, .stats-card {
-        animation: fadeIn 0.5s ease;
-    }
-`;
-document.head.appendChild(style);
 
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
