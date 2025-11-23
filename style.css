@@ -823,22 +823,16 @@ auth.-btn-container {
 }
 
 
-/* Стили для уведомлений с плавными анимациями */
 .notification {
     position: fixed;
     top: 20px;
     right: 20px;
-    background: #2ecc71;
-    color: white;
     padding: 15px 20px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    color: white;
     z-index: 10000;
     animation: slideIn 0.3s ease;
-    transition: top 0.3s ease;
-    margin-bottom: 10px;
-    max-width: 300px;
-    word-wrap: break-word;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 .notification.success {
@@ -849,41 +843,6 @@ auth.-btn-container {
     background: #e74c3c;
 }
 
-.notification.warning {
-    background: #f39c12;
-}
-
-.notification.info {
-    background: #3498db;
-}
-
-/* Анимации для уведомлений */
-@keyframes slideIn {
-    from { 
-        transform: translateX(100%); 
-        opacity: 0; 
-    }
-    to { 
-        transform: translateX(0); 
-        opacity: 1; 
-    }
-}
-
-@keyframes slideOut {
-    from { 
-        transform: translateX(0); 
-        opacity: 1; 
-    }
-    to { 
-        transform: translateX(100%); 
-        opacity: 0; 
-    }
-}
-
-/* Класс для плавного исчезновения */
-.notification.fade-out {
-    animation: slideOut 0.3s ease forwards;
-}
 /* Адаптивность */
 @media (max-width: 768px) {
     .dashboard {
@@ -909,5 +868,4 @@ auth.-btn-container {
     .product-actions {
         flex-direction: column;
     }
-
 }
