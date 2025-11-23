@@ -869,3 +869,222 @@ auth.-btn-container {
         flex-direction: column;
     }
 }
+
+/* Стили для уведомлений */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #2ecc71;
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 10000;
+    animation: slideIn 0.3s ease;
+    transition: top 0.3s ease, opacity 0.3s ease;
+    margin-bottom: 10px;
+    max-width: 350px;
+    min-width: 250px;
+}
+
+.notification.success {
+    background: #2ecc71;
+}
+
+.notification.error {
+    background: #e74c3c;
+}
+
+.notification.warning {
+    background: #f39c12;
+}
+
+.notification.info {
+    background: #3498db;
+}
+
+.notification-content {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.notification-message {
+    flex: 1;
+    word-wrap: break-word;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+    border-radius: 50%;
+}
+
+.notification-close:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.2);
+}
+
+.notification.fade-out {
+    animation: slideOut 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+    from { 
+        transform: translateX(100%); 
+        opacity: 0; 
+    }
+    to { 
+        transform: translateX(0); 
+        opacity: 1; 
+    }
+}
+
+@keyframes slideOut {
+    from { 
+        transform: translateX(0); 
+        opacity: 1; 
+    }
+    to { 
+        transform: translateX(100%); 
+        opacity: 0; 
+    }
+}
+
+/* Стили для уведомлений с фиксированным контейнером */
+#notification-container {
+    position: fixed;
+    top: 0;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 350px;
+    pointer-events: none;
+}
+
+.notification {
+    background: #2ecc71;
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    animation: slideInRight 0.3s ease;
+    transition: all 0.3s ease;
+    max-width: 350px;
+    min-width: 250px;
+    pointer-events: auto;
+    position: relative;
+    transform: translateY(0);
+}
+
+.notification.success {
+    background: #2ecc71;
+}
+
+.notification.error {
+    background: #e74c3c;
+}
+
+.notification.warning {
+    background: #f39c12;
+}
+
+.notification.info {
+    background: #3498db;
+}
+
+.notification-content {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.notification-message {
+    flex: 1;
+    word-wrap: break-word;
+    font-size: 14px;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: -2px;
+}
+
+.notification-close:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.2);
+}
+
+.notification.fade-out {
+    animation: slideOutRight 0.3s ease forwards;
+}
+
+@keyframes slideInRight {
+    from { 
+        transform: translateX(100%) translateY(var(--notification-top, 0)); 
+        opacity: 0; 
+    }
+    to { 
+        transform: translateX(0) translateY(var(--notification-top, 0)); 
+        opacity: 1; 
+    }
+}
+
+@keyframes slideOutRight {
+    from { 
+        transform: translateX(0) translateY(var(--notification-top, 0)); 
+        opacity: 1; 
+    }
+    to { 
+        transform: translateX(100%) translateY(var(--notification-top, 0)); 
+        opacity: 0; 
+    }
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    #notification-container {
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    .notification {
+        min-width: auto;
+        max-width: none;
+    }
+}
