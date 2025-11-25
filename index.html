@@ -24,7 +24,6 @@
 
     <main class="container">
         <section id="mainScreen" class="screen active">
-            <!-- Статистика -->
             <div class="dashboard">
                 <div class="stats-card">
                     <h3>📊 Статистика холодильника</h3>
@@ -42,7 +41,6 @@
                 </div>
             </div>
 
-            <!-- Список продуктов -->
             <div class="products-section">
                 <h2>🥫 Ваши продукты</h2>
                 <div class="filter-tabs">
@@ -51,23 +49,19 @@
                     <button class="filter-btn" data-filter="fresh">Свежие</button>
                 </div>
                 <div id="productsList" class="products-grid">
-                    <!-- Продукты будут здесь -->
                 </div>
             </div>
         </section>
 
-        <!-- Экран рецептов -->
         <section id="recipesScreen" class="screen">
             <div class="screen-header">
                 <button class="back-btn">← Назад к холодильнику</button>
                 <h2>📖 Рекомендуемые рецепты</h2>
             </div>
             <div id="recipesList" class="recipes-grid">
-                <!-- Рецепты будут здесь -->
             </div>
         </section>
 
-        <!-- Модальное окно добавления продукта -->
         <div id="addProductModal" class="modal">
             <div class="modal-content">
                 <span class="close">&times;</span>
@@ -96,7 +90,6 @@
             </div>
         </div>
 
-        <!-- Окно авторизации -->
         <div id="authModal" class="modal">
             <div class="modal-content auth-modal-content">
                 <span class="close auth-close">&times;</span>
@@ -157,4 +150,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>
