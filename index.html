@@ -6,7 +6,6 @@
     <title>FridgeFriend - Умный кухонный помощник</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <header>
@@ -23,6 +22,7 @@
     </header>
 
     <main class="container">
+        <!-- Главный экран -->
         <section id="mainScreen" class="screen active">
             <div class="dashboard">
                 <div class="stats-card">
@@ -53,6 +53,7 @@
             </div>
         </section>
 
+        <!-- Экран рецептов -->
         <section id="recipesScreen" class="screen">
             <div class="screen-header">
                 <button class="back-btn">← Назад к холодильнику</button>
@@ -62,6 +63,7 @@
             </div>
         </section>
 
+        <!-- Модальное окно добавления продукта -->
         <div id="addProductModal" class="modal">
             <div class="modal-content">
                 <span class="close">&times;</span>
@@ -90,6 +92,7 @@
             </div>
         </div>
 
+        <!-- Модальное окно авторизации -->
         <div id="authModal" class="modal">
             <div class="modal-content auth-modal-content">
                 <span class="close auth-close">&times;</span>
@@ -148,27 +151,29 @@
         </div>
     </main>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBLAH123456789",
-    authDomain: "fridgefriend.firebaseapp.com",
-    projectId: "fridgefriend",
-    storageBucket: "fridgefriend.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef123456"
-  };
-  
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-</script>
-    
+    <script>
+        // 🔥 ЗАМЕНИТЕ ЭТОТ КОД НА ВАШ ИЗ FIREBASE CONSOLE 🔥
+        const firebaseConfig = {
+            apiKey: "AIzaSyAC_4Hq3QmIkUIarMld_afcONzORVpM4V4",
+            authDomain: "fridgefriend-72bb7.firebaseapp.com",
+            projectId: "fridgefriend-72bb7",
+            storageBucket: "fridgefriend-72bb7.firebasestorage.app",
+            messagingSenderId: "686344102087",
+            appId: "1:686344102087:web:04785a3fa162cbdbc9dee2"
+};
+        
+        // Инициализация Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+
+    <!-- Наш скрипт -->
     <script src="script.js"></script>
 </body>
-
 </html>
-
