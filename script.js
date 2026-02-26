@@ -150,63 +150,103 @@ class FridgeFriend {
     }
 
     // 📦 ЗАГРУЗКА ПРОДУКТОВ ПОЛЬЗОВАТЕЛЯ
-    async loadFromStorage() {
-        if (!this.currentUser) {
-            // Гостевой режим
-            const saved = localStorage.getItem('fridgefriend_guest');
-            this.userProducts = saved ? JSON.parse(saved) : [];
-            if (this.userProducts.length === 0) {
-                this.addSampleProducts();
-            }
-            return;
+// 📦 ЗАГРУЗКА ПРОДУКТОВ ПОЛЬЗОВАТЕЛЯ
+async loadFromStorage() {
+    if (!this.currentUser) {
+        // Гостевой режим
+        const saved = localStorage.getItem('fridgefriend_guest');
+        this.userProducts = saved ? JSON.parse(saved) : [];
+        if (this.userProducts.length === 0) {
+            this.addSampleProducts();
         }
-
-        try {
-            const snapshot = await db.collection('userProducts')
-                .where('userId', '==', this.currentUser.id)
-                .orderBy('createdAt', 'desc')
-                .get();
-
-            this.userProducts = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-
-            // Сохраняем локальную копию
-            localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
-
-        } catch (error) {
-            console.error('Error loading products:', error);
-            const cached = localStorage.getItem(`fridgefriend_${this.currentUser.id}`);
-            this.userProducts = cached ? JSON.parse(cached) : [];
-        }
+        return;
     }
 
-    // 📦 СОХРАНЕНИЕ ПРОДУКТОВ
-    async saveToStorage() {
-        if (!this.currentUser) {
-            localStorage.setItem('fridgefriend_guest', JSON.stringify(this.userProducts));
-            return;
-        }
+    try {
+        const snapshot = await db.collection('userProducts')
+            .where('userId', '==', this.currentUser.id)
+            .orderBy('createdAt', 'desc')
+            .get();
 
-        try {
-            // Создаем batch для массовой записи
-            const batch = db.batch();
-            
-            // Удаляем старые продукты
-            const oldSnapshot = await db.collection('userProducts')
-                .where('userId', '==', this.currentUser.id)
-                .get();
-            
-            oldSnapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
+        this.userProducts = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: data.localId || doc.id, // Используем сохраненный localId или document id
+                firestoreId: doc.id, // Сохраняем Firebase ID для будущих операций
+                product_id: data.productId,
+                product_name: data.productName,
+                quantity: data.quantity,
+                unit: data.unit,
+                purchase_date: data.purchaseDate,
+                expiry_date: data.expiryDate,
+                category: data.category
+            };
+        });
+
+        console.log('Загружено продуктов:', this.userProducts.length);
+
+        // Сохраняем локальную копию
+        localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
+
+    } catch (error) {
+        console.error('Error loading products:', error);
+        const cached = localStorage.getItem(`fridgefriend_${this.currentUser.id}`);
+        this.userProducts = cached ? JSON.parse(cached) : [];
+    }
+}
+
+// 📦 СОХРАНЕНИЕ ПРОДУКТОВ
+async saveToStorage() {
+    if (!this.currentUser) {
+        localStorage.setItem('fridgefriend_guest', JSON.stringify(this.userProducts));
+        return;
+    }
+
+    try {
+        // Получаем все текущие продукты пользователя из Firebase
+        const snapshot = await db.collection('userProducts')
+            .where('userId', '==', this.currentUser.id)
+            .get();
+        
+        // Создаем Map существующих продуктов по их локальному ID
+        const existingProducts = new Map();
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            // Сохраняем связь между локальным ID и Firebase document ID
+            existingProducts.set(data.localId, {
+                firestoreId: doc.id,
+                data: data
             });
+        });
 
-            // Добавляем новые продукты
-            this.userProducts.forEach(product => {
+        // Создаем batch для операций
+        const batch = db.batch();
+
+        // Обрабатываем каждый продукт из текущего списка
+        this.userProducts.forEach(product => {
+            const existing = existingProducts.get(product.id);
+            
+            if (existing) {
+                // Продукт уже есть в Firebase - обновляем его
+                const docRef = db.collection('userProducts').doc(existing.firestoreId);
+                batch.update(docRef, {
+                    productId: product.product_id,
+                    productName: product.product_name,
+                    quantity: product.quantity,
+                    unit: product.unit,
+                    purchaseDate: product.purchase_date,
+                    expiryDate: product.expiry_date,
+                    category: product.category,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                // Удаляем из Map обработанный продукт
+                existingProducts.delete(product.id);
+            } else {
+                // Новый продукт - создаем документ
                 const newDocRef = db.collection('userProducts').doc();
                 batch.set(newDocRef, {
                     userId: this.currentUser.id,
+                    localId: product.id, // СОХРАНЯЕМ ЛОКАЛЬНЫЙ ID
                     productId: product.product_id,
                     productName: product.product_name,
                     quantity: product.quantity,
@@ -216,35 +256,25 @@ class FridgeFriend {
                     category: product.category,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-            });
-
-            await batch.commit();
-            
-            // Обновляем локальную копию
-            localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
-
-        } catch (error) {
-            console.error('Error saving products:', error);
-            localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
-            this.showMessage('Данные сохранены локально', 'info');
-        }
-    }
-
-    async migrateLocalData() {
-        const localData = localStorage.getItem('fridgefriend_guest');
-        if (localData && this.currentUser) {
-            try {
-                const localProducts = JSON.parse(localData);
-                if (localProducts.length > 0) {
-                    this.userProducts = localProducts;
-                    await this.saveToStorage();
-                    localStorage.removeItem('fridgefriend_guest');
-                    this.showMessage('📦 Ваши данные перенесены в облако!', 'success');
-                }
-            } catch (e) {
-                console.error('Error migrating data:', e);
             }
-        }
+        });
+
+        // Удаляем продукты, которых нет в текущем списке
+        existingProducts.forEach((value) => {
+            const docRef = db.collection('userProducts').doc(value.firestoreId);
+            batch.delete(docRef);
+        });
+
+        await batch.commit();
+        
+        // Обновляем локальную копию
+        localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
+        console.log('Продукты сохранены:', this.userProducts.length);
+
+    } catch (error) {
+        console.error('Error saving products:', error);
+        localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
+        this.showMessage('Данные сохранены локально', 'info');
     }
 
     // 📋 ЛОКАЛЬНЫЕ ДАННЫЕ (НА СЛУЧАЙ ОШИБКИ)
@@ -485,11 +515,13 @@ class FridgeFriend {
     }
 
     async useProduct(productId) {
-        if (confirm('Отметить продукт как использованный?')) {
-            this.userProducts = this.userProducts.filter(p => p.id !== productId);
-            await this.saveToStorage();
-            this.showMessage('🍽️ Продукт использован!', 'success');
-            this.updateDisplay();
+    if (confirm('Отметить продукт как использованный?')) {
+        // Удаляем из локального массива
+        this.userProducts = this.userProducts.filter(p => p.id !== productId);
+        // Сохраняем изменения в Firebase
+        await this.saveToStorage();
+        this.showMessage('🍽️ Продукт использован!', 'success');
+        this.updateDisplay();
         }
     }
 
@@ -838,3 +870,29 @@ function signup() {
 document.addEventListener('DOMContentLoaded', () => {
     window.fridgeFriend = new FridgeFriend();
 });
+
+// 🔍 МЕТОД ДЛЯ ОТЛАДКИ
+async checkFirebaseData() {
+    if (!this.currentUser) return;
+    
+    try {
+        const snapshot = await db.collection('userProducts')
+            .where('userId', '==', this.currentUser.id)
+            .get();
+        
+        console.log('=== ДАННЫЕ В FIREBASE ===');
+        console.log('Всего документов:', snapshot.docs.length);
+        snapshot.docs.forEach(doc => {
+            console.log('Document ID:', doc.id);
+            console.log('Data:', doc.data());
+        });
+        console.log('=========================');
+        
+        console.log('=== ЛОКАЛЬНЫЕ ДАННЫЕ ===');
+        console.log('Продукты:', this.userProducts);
+        console.log('=========================');
+        
+    } catch (error) {
+        console.error('Ошибка проверки Firebase:', error);
+    }
+}
