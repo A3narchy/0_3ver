@@ -1,13 +1,47 @@
-
 class FridgeFriend {
     constructor() {
-        this.supabase = null;
         this.currentUser = null;
         this.userProducts = [];
+        this.availableProducts = [];
+        this.availableRecipes = [];
         this.init();
     }
 
-    // 🔐 МЕТОДЫ АВТОРИЗАЦИИ
+    async init() {
+        await this.loadProductsAndRecipes();
+        this.setupEventListeners();
+        this.loadProductOptions();
+        this.setDefaultDates();
+        this.setupAuthListener();
+        await this.loadFromStorage();
+        this.updateDisplay();
+    }
+
+    // 🔐 СЛУШАЕМ ИЗМЕНЕНИЯ АВТОРИЗАЦИИ
+    setupAuthListener() {
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                // Пользователь вошел
+                this.currentUser = {
+                    id: user.uid,
+                    email: user.email,
+                    username: user.displayName || user.email.split('@')[0]
+                };
+                this.updateAuthUI();
+                await this.migrateLocalData();
+                await this.loadFromStorage();
+                this.updateDisplay();
+            } else {
+                // Пользователь вышел
+                this.currentUser = null;
+                this.updateAuthUI();
+                await this.loadFromStorage();
+                this.updateDisplay();
+            }
+        });
+    }
+
+    // 🔐 РЕГИСТРАЦИЯ
     async signup() {
         const email = document.getElementById('signupEmail').value.trim();
         const password = document.getElementById('signupPassword').value;
@@ -24,20 +58,19 @@ class FridgeFriend {
         }
 
         try {
-            // Регистрация в Supabase
-            const { data, error } = await this.supabase.auth.signUp({
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            await userCredential.user.updateProfile({
+                displayName: username
+            });
+            
+            // Создаем запись пользователя в Firestore
+            await db.collection('users').doc(userCredential.user.uid).set({
+                username: username,
                 email: email,
-                password: password,
-                options: {
-                    data: {
-                        username: username
-                    }
-                }
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            if (error) throw error;
-
-            this.showMessage('✅ Регистрация успешна! Проверьте email для подтверждения.', 'success');
+            this.showMessage('✅ Регистрация успешна!', 'success');
             change_to_login();
             
         } catch (error) {
@@ -45,6 +78,7 @@ class FridgeFriend {
         }
     }
 
+    // 🔐 ВХОД
     async login() {
         const email = document.getElementById('loginEmail').value.trim();
         const password = document.getElementById('loginPassword').value;
@@ -55,33 +89,150 @@ class FridgeFriend {
         }
 
         try {
-            const { data, error } = await this.supabase.auth.signInWithPassword({
-                email: email,
-                password: password
-            });
-
-            if (error) throw error;
-
-            this.currentUser = data.user;
-            this.updateAuthUI();
+            await auth.signInWithEmailAndPassword(email, password);
             this.hideModal('authModal');
-            
-            // Мигрируем данные из localStorage в Supabase при первом входе
-            await this.migrateLocalData();
-            
-            await this.loadFromStorage();
-            this.updateDisplay();
-            this.showMessage(`🎉 Добро пожаловать, ${data.user.user_metadata.username}!`, 'success');
+            this.showMessage('🎉 Добро пожаловать!', 'success');
             
         } catch (error) {
             this.showMessage(`❌ Ошибка входа: ${error.message}`, 'error');
         }
     }
 
+    // 🔐 ВЫХОД
+    async logout() {
+        if (confirm('Вы уверены, что хотите выйти?')) {
+            try {
+                await auth.signOut();
+                this.showMessage('👋 До свидания!', 'success');
+            } catch (error) {
+                this.showMessage('Ошибка при выходе', 'error');
+            }
+        }
+    }
+
+    updateAuthUI() {
+        const authBtn = document.getElementById('authBtn');
+        const userWelcome = document.getElementById('userWelcome');
+        
+        if (this.currentUser) {
+            authBtn.textContent = '🚪 Выйти';
+            userWelcome.textContent = `👋 Привет, ${this.currentUser.username}`;
+            userWelcome.style.display = 'block';
+        } else {
+            authBtn.textContent = '🔐 Войти';
+            userWelcome.style.display = 'none';
+        }
+    }
+
+    // 📦 ЗАГРУЗКА ПРОДУКТОВ И РЕЦЕПТОВ ИЗ FIREBASE
+    async loadProductsAndRecipes() {
+        try {
+            // Загружаем продукты
+            const productsSnapshot = await db.collection('products').get();
+            this.availableProducts = productsSnapshot.docs.map(doc => ({
+                id: Number(doc.id) || doc.id,
+                ...doc.data()
+            }));
+
+            // Загружаем рецепты
+            const recipesSnapshot = await db.collection('recipes').get();
+            this.availableRecipes = recipesSnapshot.docs.map(doc => ({
+                id: Number(doc.id) || doc.id,
+                ...doc.data()
+            }));
+
+        } catch (error) {
+            console.error('Error loading catalog:', error);
+            this.showMessage('Ошибка загрузки каталога', 'error');
+            this.availableProducts = this.getLocalProducts();
+            this.availableRecipes = this.getLocalRecipes();
+        }
+    }
+
+    // 📦 ЗАГРУЗКА ПРОДУКТОВ ПОЛЬЗОВАТЕЛЯ
+    async loadFromStorage() {
+        if (!this.currentUser) {
+            // Гостевой режим
+            const saved = localStorage.getItem('fridgefriend_guest');
+            this.userProducts = saved ? JSON.parse(saved) : [];
+            if (this.userProducts.length === 0) {
+                this.addSampleProducts();
+            }
+            return;
+        }
+
+        try {
+            const snapshot = await db.collection('userProducts')
+                .where('userId', '==', this.currentUser.id)
+                .orderBy('createdAt', 'desc')
+                .get();
+
+            this.userProducts = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // Сохраняем локальную копию
+            localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
+
+        } catch (error) {
+            console.error('Error loading products:', error);
+            const cached = localStorage.getItem(`fridgefriend_${this.currentUser.id}`);
+            this.userProducts = cached ? JSON.parse(cached) : [];
+        }
+    }
+
+    // 📦 СОХРАНЕНИЕ ПРОДУКТОВ
+    async saveToStorage() {
+        if (!this.currentUser) {
+            localStorage.setItem('fridgefriend_guest', JSON.stringify(this.userProducts));
+            return;
+        }
+
+        try {
+            // Создаем batch для массовой записи
+            const batch = db.batch();
+            
+            // Удаляем старые продукты
+            const oldSnapshot = await db.collection('userProducts')
+                .where('userId', '==', this.currentUser.id)
+                .get();
+            
+            oldSnapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            // Добавляем новые продукты
+            this.userProducts.forEach(product => {
+                const newDocRef = db.collection('userProducts').doc();
+                batch.set(newDocRef, {
+                    userId: this.currentUser.id,
+                    productId: product.product_id,
+                    productName: product.product_name,
+                    quantity: product.quantity,
+                    unit: product.unit,
+                    purchaseDate: product.purchase_date,
+                    expiryDate: product.expiry_date,
+                    category: product.category,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            });
+
+            await batch.commit();
+            
+            // Обновляем локальную копию
+            localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
+
+        } catch (error) {
+            console.error('Error saving products:', error);
+            localStorage.setItem(`fridgefriend_${this.currentUser.id}`, JSON.stringify(this.userProducts));
+            this.showMessage('Данные сохранены локально', 'info');
+        }
+    }
+
     async migrateLocalData() {
-        // Переносим данные из localStorage в Supabase при первом входе
         const localData = localStorage.getItem('fridgefriend_guest');
-        if (localData) {
+        if (localData && this.currentUser) {
             try {
                 const localProducts = JSON.parse(localData);
                 if (localProducts.length > 0) {
@@ -96,228 +247,8 @@ class FridgeFriend {
         }
     }
 
-    async logout() {
-        if (confirm('Вы уверены, что хотите выйти?')) {
-            const { error } = await this.supabase.auth.signOut();
-            if (error) {
-                this.showMessage('Ошибка при выходе', 'error');
-                return;
-            }
-            
-            this.currentUser = null;
-            this.updateAuthUI();
-            await this.loadFromStorage();
-            this.updateDisplay();
-            this.showMessage('👋 До свидания!', 'success');
-        }
-    }
-
-    async checkAuthStatus() {
-        try {
-            const { data: { user } } = await this.supabase.auth.getUser();
-            this.currentUser = user;
-            this.updateAuthUI();
-            
-            if (user) {
-                await this.loadFromStorage();
-                this.updateDisplay();
-            }
-        } catch (error) {
-            console.error('Auth check error:', error);
-        }
-    }
-
-    updateAuthUI() {
-        const authBtn = document.getElementById('authBtn');
-        const userWelcome = document.getElementById('userWelcome');
-        
-        if (this.currentUser) {
-            const username = this.currentUser.user_metadata?.username || this.currentUser.email;
-            authBtn.textContent = '🚪 Выйти';
-            userWelcome.textContent = `👋 Привет, ${username}`;
-            userWelcome.style.display = 'block';
-        } else {
-            authBtn.textContent = '🔐 Войти';
-            userWelcome.style.display = 'none';
-        }
-    }
-
-    // 📦 МЕТОДЫ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ
-    async loadFromStorage() {
-        if (!this.currentUser) {
-            // Для неавторизованных - локальное хранилище
-            const saved = localStorage.getItem('fridgefriend_guest');
-            this.userProducts = saved ? JSON.parse(saved) : [];
-            if (this.userProducts.length === 0) {
-                this.addSampleProducts();
-            }
-            return;
-        }
-
-        // Для авторизованных - загрузка из Supabase
-        try {
-            const { data, error } = await this.supabase
-                .from('user_products')
-                .select('*')
-                .eq('user_id', this.currentUser.id)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-
-            this.userProducts = data || [];
-        } catch (error) {
-            console.error('Error loading products:', error);
-            this.userProducts = [];
-        }
-    }
-
-    async saveToStorage() {
-        if (!this.currentUser) {
-            // Для гостей - локальное хранилище
-            localStorage.setItem('fridgefriend_guest', JSON.stringify(this.userProducts));
-            return;
-        }
-
-        // Для авторизованных - сохранение в Supabase
-        try {
-            // Удаляем все старые продукты пользователя
-            const { error: deleteError } = await this.supabase
-                .from('user_products')
-                .delete()
-                .eq('user_id', this.currentUser.id);
-
-            if (deleteError) throw deleteError;
-
-            // Добавляем новые продукты
-            if (this.userProducts.length > 0) {
-                const productsToSave = this.userProducts.map(product => ({
-                    user_id: this.currentUser.id,
-                    product_id: product.product_id,
-                    product_name: product.product_name,
-                    quantity: product.quantity,
-                    unit: product.unit,
-                    purchase_date: product.purchase_date,
-                    expiry_date: product.expiry_date,
-                    category: product.category
-                }));
-
-                const { error: insertError } = await this.supabase
-                    .from('user_products')
-                    .insert(productsToSave);
-
-                if (insertError) throw insertError;
-            }
-        } catch (error) {
-            console.error('Error saving products:', error);
-            this.showMessage('Ошибка сохранения данных', 'error');
-        }
-    }
-
-    async addProduct(e) {
-        e.preventDefault();
-        
-        const productId = parseInt(document.getElementById('productName').value);
-        const quantity = parseFloat(document.getElementById('quantity').value);
-        const purchaseDate = document.getElementById('purchaseDate').value;
-        const expiryDate = document.getElementById('expiryDate').value;
-
-        if (!productId || !quantity) {
-            this.showMessage('Заполните все поля!', 'error');
-            return;
-        }
-
-        const product = this.getAvailableProducts().find(p => p.id === productId);
-        
-        const newProduct = {
-            id: Date.now(), // Временный ID для локального использования
-            product_id: productId,
-            product_name: product.name,
-            quantity: quantity,
-            unit: product.unit,
-            purchase_date: purchaseDate,
-            expiry_date: expiryDate,
-            category: product.category
-        };
-
-        this.userProducts.push(newProduct);
-        await this.saveToStorage();
-        
-        this.hideModal('addProductModal');
-        this.showMessage('✅ Продукт успешно добавлен!', 'success');
-        this.updateDisplay();
-        
-        document.getElementById('addProductForm').reset();
-        this.setDefaultDates();
-    }
-
-    async useProduct(productId) {
-        if (confirm('Отметить продукт как использованный?')) {
-            this.userProducts = this.userProducts.filter(p => p.id !== productId);
-            await this.saveToStorage();
-            this.showMessage('🍽️ Продукт использован!', 'success');
-            this.updateDisplay();
-        }
-    }
-
-    async clearData() {
-        if (confirm('Очистить все данные? Это действие нельзя отменить.')) {
-            this.userProducts = [];
-            await this.saveToStorage();
-            this.showMessage('🗑️ Все данные очищены!', 'success');
-            this.updateDisplay();
-        }
-    }
-
-    // 🔧 ОСТАЛЬНЫЕ МЕТОДЫ
-    setupEventListeners() {
-        document.getElementById('addProductBtn').addEventListener('click', () => this.showModal('addProductModal'));
-        document.querySelectorAll('.close').forEach(closeBtn => {
-            closeBtn.addEventListener('click', (e) => {
-                const modal = e.target.closest('.modal');
-                if (modal) {
-                    this.hideModal(modal.id);
-                }
-            });
-        });
-        
-        document.getElementById('addProductForm').addEventListener('submit', (e) => this.addProduct(e));
-        
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.filterProducts(e.target.dataset.filter));
-        });
-        
-        document.getElementById('viewRecipesBtn').addEventListener('click', () => this.showRecipes());
-        document.getElementById('clearDataBtn').addEventListener('click', () => this.clearData());
-        document.querySelector('.back-btn').addEventListener('click', () => this.showMainScreen());
-        
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                this.hideModal('addProductModal');
-                this.hideModal('authModal');
-            }
-        });
-
-        document.getElementById('authBtn').addEventListener('click', () => this.showAuthModal());
-
-        // Enter в форме
-        document.getElementById('addProductForm').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.addProduct(e);
-            }
-        });
-    }
-
-    showAuthModal() {
-        if (this.currentUser) {
-            this.logout();
-        } else {
-            this.showModal('authModal');
-        }
-    }
-
-    // 📋 МЕТОДЫ ДЛЯ ПРОДУКТОВ И РЕЦЕПТОВ
-    getAvailableProducts() {
+    // 📋 ЛОКАЛЬНЫЕ ДАННЫЕ (НА СЛУЧАЙ ОШИБКИ)
+    getLocalProducts() {
         return [
             { id: 1, name: 'Молоко', category: 'молочные', unit: 'л', shelf_life: 5 },
             { id: 2, name: 'Яйца', category: 'молочные', unit: 'шт', shelf_life: 21 },
@@ -334,7 +265,7 @@ class FridgeFriend {
         ];
     }
 
-    getAvailableRecipes() {
+    getLocalRecipes() {
         return [
             {
                 id: 1,
@@ -388,6 +319,14 @@ class FridgeFriend {
         ];
     }
 
+    getAvailableProducts() {
+        return this.availableProducts.length > 0 ? this.availableProducts : this.getLocalProducts();
+    }
+
+    getAvailableRecipes() {
+        return this.availableRecipes.length > 0 ? this.availableRecipes : this.getLocalRecipes();
+    }
+
     loadProductOptions() {
         const select = document.getElementById('productName');
         select.innerHTML = '<option value="">Выберите продукт</option>';
@@ -411,6 +350,53 @@ class FridgeFriend {
                 document.getElementById('quantity').value = '0.5';
             }
         });
+    }
+
+    setupEventListeners() {
+        document.getElementById('addProductBtn').addEventListener('click', () => this.showModal('addProductModal'));
+        
+        document.querySelectorAll('.close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', (e) => {
+                const modal = e.target.closest('.modal');
+                if (modal) {
+                    this.hideModal(modal.id);
+                }
+            });
+        });
+        
+        document.getElementById('addProductForm').addEventListener('submit', (e) => this.addProduct(e));
+        
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.filterProducts(e.target.dataset.filter));
+        });
+        
+        document.getElementById('viewRecipesBtn').addEventListener('click', () => this.showRecipes());
+        document.getElementById('clearDataBtn').addEventListener('click', () => this.clearData());
+        document.querySelector('.back-btn').addEventListener('click', () => this.showMainScreen());
+        
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                this.hideModal('addProductModal');
+                this.hideModal('authModal');
+            }
+        });
+
+        document.getElementById('authBtn').addEventListener('click', () => this.showAuthModal());
+
+        document.getElementById('addProductForm').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.addProduct(e);
+            }
+        });
+    }
+
+    showAuthModal() {
+        if (this.currentUser) {
+            this.logout();
+        } else {
+            this.showModal('authModal');
+        }
     }
 
     setDefaultDates() {
@@ -459,6 +445,61 @@ class FridgeFriend {
 
         this.userProducts.push(...sampleProducts);
         this.saveToStorage();
+    }
+
+    async addProduct(e) {
+        e.preventDefault();
+        
+        const productId = parseInt(document.getElementById('productName').value);
+        const quantity = parseFloat(document.getElementById('quantity').value);
+        const purchaseDate = document.getElementById('purchaseDate').value;
+        const expiryDate = document.getElementById('expiryDate').value;
+
+        if (!productId || !quantity) {
+            this.showMessage('Заполните все поля!', 'error');
+            return;
+        }
+
+        const product = this.getAvailableProducts().find(p => p.id === productId);
+        
+        const newProduct = {
+            id: Date.now(),
+            product_id: productId,
+            product_name: product.name,
+            quantity: quantity,
+            unit: product.unit,
+            purchase_date: purchaseDate,
+            expiry_date: expiryDate,
+            category: product.category
+        };
+
+        this.userProducts.push(newProduct);
+        await this.saveToStorage();
+        
+        this.hideModal('addProductModal');
+        this.showMessage('✅ Продукт успешно добавлен!', 'success');
+        this.updateDisplay();
+        
+        document.getElementById('addProductForm').reset();
+        this.setDefaultDates();
+    }
+
+    async useProduct(productId) {
+        if (confirm('Отметить продукт как использованный?')) {
+            this.userProducts = this.userProducts.filter(p => p.id !== productId);
+            await this.saveToStorage();
+            this.showMessage('🍽️ Продукт использован!', 'success');
+            this.updateDisplay();
+        }
+    }
+
+    async clearData() {
+        if (confirm('Очистить все данные? Это действие нельзя отменить.')) {
+            this.userProducts = [];
+            await this.saveToStorage();
+            this.showMessage('🗑️ Все данные очищены!', 'success');
+            this.updateDisplay();
+        }
     }
 
     filterProducts(filter) {
@@ -640,7 +681,6 @@ class FridgeFriend {
         }
     }
 
-    // 🎯 ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
     showModal(modalId) {
         document.getElementById(modalId).style.display = 'block';
     }
@@ -658,67 +698,65 @@ class FridgeFriend {
         this.showScreen('mainScreen');
     }
 
-// 🔔 ИСПРАВЛЕННЫЕ УВЕДОМЛЕНИЯ БЕЗ НАЛОЖЕНИЯ
-showMessage(message, type) {
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.innerHTML = `
-        <div class="notification-content">
-            <span class="notification-message">${message}</span>
-            <button class="notification-close" onclick="this.parentElement.parentElement.remove(); window.fridgeFriend.recalculateNotifications()">×</button>
-        </div>
-    `;
-    
-    // Создаем контейнер для уведомлений если его нет
-    let notificationContainer = document.getElementById('notification-container');
-    if (!notificationContainer) {
-        notificationContainer = document.createElement('div');
-        notificationContainer.id = 'notification-container';
-        notificationContainer.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-width: 350px;
-        `;
-        document.body.appendChild(notificationContainer);
-    }
-    
-    // Добавляем уведомление в контейнер
-    notificationContainer.appendChild(notification);
-    
-    // Пересчитываем позиции всех уведомлений
-    this.recalculateNotifications();
-    
-    // Автоматическое удаление через 4 секунды
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.classList.add('fade-out');
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                    this.recalculateNotifications();
-                }
-            }, 300);
+    showMessage(message, type) {
+        // Создаем контейнер для уведомлений если его нет
+        let notificationContainer = document.getElementById('notification-container');
+        if (!notificationContainer) {
+            notificationContainer = document.createElement('div');
+            notificationContainer.id = 'notification-container';
+            notificationContainer.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                max-width: 350px;
+            `;
+            document.body.appendChild(notificationContainer);
         }
-    }, 4000);
-}
 
-recalculateNotifications() {
-    const notificationContainer = document.getElementById('notification-container');
-    if (!notificationContainer) return;
-    
-    const notifications = notificationContainer.querySelectorAll('.notification');
-    let currentTop = 20;
-    
-    notifications.forEach((notif) => {
-        notif.style.transform = `translateY(${currentTop}px)`;
-        currentTop += notif.offsetHeight + 10; // 10px отступ между уведомлениями
-    });
-}
+        // Создаем уведомление
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span class="notification-message">${message}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove(); window.fridgeFriend.recalculateNotifications()">×</button>
+            </div>
+        `;
+        
+        notificationContainer.appendChild(notification);
+        this.recalculateNotifications();
+        
+        // Автоматическое удаление через 4 секунды
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.add('fade-out');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                        this.recalculateNotifications();
+                    }
+                }, 300);
+            }
+        }, 4000);
+    }
+
+    recalculateNotifications() {
+        const notificationContainer = document.getElementById('notification-container');
+        if (!notificationContainer) return;
+        
+        const notifications = notificationContainer.querySelectorAll('.notification');
+        let currentTop = 20;
+        
+        notifications.forEach((notif) => {
+            notif.style.transform = `translateY(${currentTop}px)`;
+            currentTop += notif.offsetHeight + 10;
+        });
+    }
+
     isProductExpiring(expiryDate) {
         const today = new Date();
         const threeDaysLater = new Date();
@@ -800,4 +838,3 @@ function signup() {
 document.addEventListener('DOMContentLoaded', () => {
     window.fridgeFriend = new FridgeFriend();
 });
-
