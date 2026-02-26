@@ -1,6 +1,3 @@
-// Конфигурация Supabase
-const SUPABASE_URL = 'https://ntcschzvtnnvdkixcsho.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50Y3NjaHp2dG5udmRraXhjc2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTEzMDUsImV4cCI6MjA3OTQ2NzMwNX0.ejDPEx5bXDznE25mej9p0tmP1-c_wuOip2HHsWCXWBE';
 
 class FridgeFriend {
     constructor() {
@@ -8,18 +5,6 @@ class FridgeFriend {
         this.currentUser = null;
         this.userProducts = [];
         this.init();
-    }
-
-    async init() {
-        // Инициализируем Supabase
-        this.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        this.setupEventListeners();
-        this.loadProductOptions();
-        this.setDefaultDates();
-        await this.checkAuthStatus();
-        await this.loadFromStorage();
-        this.updateDisplay();
     }
 
     // 🔐 МЕТОДЫ АВТОРИЗАЦИИ
@@ -815,3 +800,4 @@ function signup() {
 document.addEventListener('DOMContentLoaded', () => {
     window.fridgeFriend = new FridgeFriend();
 });
+
