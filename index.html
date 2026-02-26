@@ -148,7 +148,27 @@
         </div>
     </main>
 
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBLAH123456789",
+    authDomain: "fridgefriend.firebaseapp.com",
+    projectId: "fridgefriend",
+    storageBucket: "fridgefriend.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef123456"
+  };
+  
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+</script>
+    
     <script src="script.js"></script>
 </body>
 
 </html>
+
